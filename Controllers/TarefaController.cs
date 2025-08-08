@@ -1,6 +1,8 @@
 using Microsoft.AspNetCore.Mvc;
 using TrilhaApiDesafio.Context;
+using TrilhaApiDesafio.Exceptions;
 using TrilhaApiDesafio.Models;
+using TrilhaApiDesafio.UseCases.Tarefas;
 
 namespace TrilhaApiDesafio.Controllers
 {
@@ -9,88 +11,189 @@ namespace TrilhaApiDesafio.Controllers
     public class TarefaController : ControllerBase
     {
         private readonly OrganizadorContext _context;
+        private readonly ObterTarefaPorIdUseCase _obterTarefaPorId;
+        private readonly ObterTarefasUseCase _obterTarefas;
+        private readonly ObterTarefaPorDataUseCase _obterTarefaPorData;
+        private readonly ObterTarefaPorStatusUseCase _obterTarefaPorStatus;
+        private readonly ObterTarefaPorTituloUseCase _obterTarefaPorTitulo;
+        private readonly CriarTarefaUseCase _criarTarefa;
+        private readonly AtualizarTarefaUseCase _atualizarTarefa;
+        private readonly DeletarTarefaUseCase _deletarTarefa;
 
-        public TarefaController(OrganizadorContext context)
+
+        public TarefaController(OrganizadorContext context,
+                                ObterTarefaPorIdUseCase obterTarefaPorId,
+                                ObterTarefasUseCase obterTarefas,
+                                ObterTarefaPorDataUseCase obterTarefaPorData,
+                                ObterTarefaPorStatusUseCase obterTarefaPorStatus,
+                                ObterTarefaPorTituloUseCase obterTarefaPorTitulo,
+                                CriarTarefaUseCase criarTarefa,
+                                AtualizarTarefaUseCase atualizarTarefa,
+                                DeletarTarefaUseCase deletarTarefa)
         {
             _context = context;
+            _obterTarefaPorId = obterTarefaPorId;
+            _obterTarefas = obterTarefas;
+            _obterTarefaPorData = obterTarefaPorData;
+            _obterTarefaPorStatus = obterTarefaPorStatus;
+            _obterTarefaPorTitulo = obterTarefaPorTitulo;
+            _criarTarefa = criarTarefa;
+            _atualizarTarefa = atualizarTarefa;
+            _deletarTarefa = deletarTarefa;
         }
 
         [HttpGet("{id}")]
-        public IActionResult ObterPorId(int id)
+        public async Task<IActionResult> ObterPorId(int id)
         {
-            // TODO: Buscar o Id no banco utilizando o EF
-            // TODO: Validar o tipo de retorno. Se não encontrar a tarefa, retornar NotFound,
-            // caso contrário retornar OK com a tarefa encontrada
-            return Ok();
+            try
+            {
+                var tarefa = await _obterTarefaPorId.Executar(id);
+            
+                return Ok(tarefa);
+            }
+            catch (NotFoundException exception)
+            {
+                return NotFound(exception.Message);
+            }
+            catch (ArgumentException exception)
+            {
+                return BadRequest(exception.Message);
+            }
+            catch (Exception)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError);
+            }
         }
 
         [HttpGet("ObterTodos")]
-        public IActionResult ObterTodos()
+        public async Task<IActionResult> ObterTodos()
         {
-            // TODO: Buscar todas as tarefas no banco utilizando o EF
-            return Ok();
+            try
+            {
+                var tarefas = await _obterTarefas.Executar();
+
+                return Ok(tarefas);
+            }
+            catch (Exception)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError);
+            }
         }
 
         [HttpGet("ObterPorTitulo")]
-        public IActionResult ObterPorTitulo(string titulo)
+        public async Task<IActionResult> ObterPorTitulo(string titulo)
         {
-            // TODO: Buscar  as tarefas no banco utilizando o EF, que contenha o titulo recebido por parâmetro
-            // Dica: Usar como exemplo o endpoint ObterPorData
-            return Ok();
+
+            try
+            {
+                var tarefas = await _obterTarefaPorTitulo.Executar(titulo);
+
+                return Ok(tarefas);
+            }
+            catch (ArgumentNullException exception)
+            {
+                return BadRequest(exception.Message);
+            }
+            catch (Exception)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError);
+            }
         }
 
         [HttpGet("ObterPorData")]
-        public IActionResult ObterPorData(DateTime data)
+        public async Task<IActionResult> ObterPorData(DateTime data)
         {
-            var tarefa = _context.Tarefas.Where(x => x.Data.Date == data.Date);
-            return Ok(tarefa);
+            try
+            {
+                var tarefas = await _obterTarefaPorData.Executar(data);
+
+                return Ok(tarefas);
+            }
+            catch (Exception)
+            {
+
+                throw;
+            }
         }
 
         [HttpGet("ObterPorStatus")]
-        public IActionResult ObterPorStatus(EnumStatusTarefa status)
+        public async Task<IActionResult> ObterPorStatus(EnumStatusTarefa status)
         {
-            // TODO: Buscar  as tarefas no banco utilizando o EF, que contenha o status recebido por parâmetro
-            // Dica: Usar como exemplo o endpoint ObterPorData
-            var tarefa = _context.Tarefas.Where(x => x.Status == status);
-            return Ok(tarefa);
+            try
+            {
+                var tarefas = await _obterTarefaPorStatus.Executar(status);
+
+                return Ok(tarefas);
+            }
+            catch (Exception)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError);
+            }
         }
 
         [HttpPost]
-        public IActionResult Criar(Tarefa tarefa)
+        public async Task<IActionResult> Criar(Tarefa tarefa)
         {
-            if (tarefa.Data == DateTime.MinValue)
-                return BadRequest(new { Erro = "A data da tarefa não pode ser vazia" });
+            try
+            {
+                await _criarTarefa.Executar(tarefa);
 
-            // TODO: Adicionar a tarefa recebida no EF e salvar as mudanças (save changes)
-            return CreatedAtAction(nameof(ObterPorId), new { id = tarefa.Id }, tarefa);
+                return CreatedAtAction(nameof(ObterPorId), new { id = tarefa.Id }, tarefa);
+            }
+            catch (ArgumentNullException exception)
+            {
+                return BadRequest(exception.Message);
+            }
+            catch (Exception)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError);
+            }
         }
 
         [HttpPut("{id}")]
-        public IActionResult Atualizar(int id, Tarefa tarefa)
+        public async Task<IActionResult> Atualizar(int id, Tarefa tarefa)
         {
-            var tarefaBanco = _context.Tarefas.Find(id);
+            try
+            {
+                await _atualizarTarefa.Executar(id, tarefa);
 
-            if (tarefaBanco == null)
-                return NotFound();
-
-            if (tarefa.Data == DateTime.MinValue)
-                return BadRequest(new { Erro = "A data da tarefa não pode ser vazia" });
-
-            // TODO: Atualizar as informações da variável tarefaBanco com a tarefa recebida via parâmetro
-            // TODO: Atualizar a variável tarefaBanco no EF e salvar as mudanças (save changes)
-            return Ok();
+                return NoContent();
+            }
+            catch (NotFoundException exception)
+            {
+                return NotFound(exception.Message);
+            }
+            catch (ArgumentException exception)
+            {
+                return BadRequest(exception.Message);
+            }
+            catch (Exception)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError);
+            }
         }
 
         [HttpDelete("{id}")]
-        public IActionResult Deletar(int id)
+        public async Task<IActionResult> Deletar(int id)
         {
-            var tarefaBanco = _context.Tarefas.Find(id);
+            try
+            {
+                await _deletarTarefa.Executar(id);
 
-            if (tarefaBanco == null)
-                return NotFound();
-
-            // TODO: Remover a tarefa encontrada através do EF e salvar as mudanças (save changes)
-            return NoContent();
+                return NoContent();
+            }
+            catch(NotFoundException exception)
+            {
+                return NotFound(exception.Message);
+            }
+            catch (ArgumentException exception)
+            {
+                return BadRequest(exception.Message);
+            }
+            catch (Exception)
+            {
+                return StatusCode(StatusCodes.Status500InternalServerError);
+            }
         }
     }
 }
